@@ -31,3 +31,23 @@ jobs:
             
             # Restart PM2 process (Replace 'delivery-box' with your PM2 app name)
             pm2 restart delivery-box
+
+      - name: Notify on Failure
+        if: failure()
+        uses: tsickert/discord-webhook@v7.0.0
+        with:
+          webhook-url: ${{ secrets.DISCORD_WEBHOOK_URL }}
+          content: "@everyone DEPLOYMENT FAILED! "
+          embed-description: "`api.meiraba.me` Check the GitHub Actions log for details: \n${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}"
+          embed-title: "Deployment FAILED!"
+          embed-color: 15158332 # Red
+
+      - name: Notify on Success
+        if: success()
+        uses: tsickert/discord-webhook@v7.0.0
+        with:
+          webhook-url: ${{ secrets.DISCORD_WEBHOOK_URL }}
+          content: "@everyone Deployment process successful!."
+          embed-description: "`api.meiraba.me` was updated with the latest push."
+          embed-title: "✅ Deployment Successful!"
+          embed-color: 3066993
