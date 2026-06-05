@@ -146,4 +146,25 @@ app.get('/api/active-otps', (req, res) => {
     res.json({ status: "success", data: active });
 });
 
-app.listen(3000, () => console.log('Smart Bin Server running on port 3000'));
+const PORT = process.env.PORT || 3001;
+const server = app.listen(PORT, () => console.log(`Smart Bin Server running on port ${PORT}`));
+
+// --- GRACEFUL SHUTDOWN (PM2) ---
+process.on('SIGINT', async () => {
+    console.log('SIGINT signal received: gracefully shutting down...');
+    
+    // Close cache
+    cache.flushAll();
+    cache.close();
+    
+    // Close WhatsApp connection
+    if (sock) {
+        sock.end(undefined);
+    }
+    
+    // Close HTTP Server
+    server.close(() => {
+        console.log('HTTP server closed. Exiting process.');
+        process.exit(0);
+    });
+});
