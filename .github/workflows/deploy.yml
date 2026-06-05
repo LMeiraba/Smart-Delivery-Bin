@@ -20,6 +20,9 @@ jobs:
           username: ${{ secrets.SSH_USER }}
           key: ${{ secrets.SSH_PRIVATE_KEY }}
           script: |
+            # Fix Git dubious ownership issue
+            git config --global --add safe.directory /home/meiraba_school/node/Smart-Delivery-Bin
+            
             cd /home/meiraba_school/node/Smart-Delivery-Bin
             
             # Pull latest changes
@@ -28,8 +31,8 @@ jobs:
             # Install any new dependencies
             npm install
             
-            # Restart PM2 process
-            pm2 restart delivery-box
+            # Restart PM2 process (or start it if it doesn't exist)
+            pm2 restart delivery-box || pm2 start server.js --name delivery-box
 
       - name: Notify on Failure
         if: failure()
