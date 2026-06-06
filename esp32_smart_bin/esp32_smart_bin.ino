@@ -8,6 +8,7 @@
 #include <Adafruit_SSD1306.h>
 #include <Keypad.h>
 #include "config.h"
+#include <ctype.h>
 
 // --- PIN MAPPING ---
 // OLED I2C
@@ -46,6 +47,8 @@ enum State { STATE_IDLE, STATE_VERIFYING, STATE_AWAIT_DEPOSIT };
 State currentState = STATE_IDLE;
 String currentInput = "";
 bool shouldSaveConfig = false;
+unsigned long lastInteractionTime = 0;
+bool isScreenOff = false;
 
 // Callback for WiFiManager
 void saveConfigCallback() {
@@ -64,15 +67,16 @@ void setup() {
   // Init OLED
   Wire.begin(OLED_SDA, OLED_SCL);
   if(!display.begin(SSD1306_SWITCHCAPVCC, 0x3C)) {
-    Serial.println(F("SSD1306 allocation failed"));
-    for(;;); // Don't proceed, loop forever
+    Serial.println(F("SSD1306 allocation failed. Running in Serial-only mode."));
+    // Removed infinite loop so we can test without OLED
+  } else {
+    display.clearDisplay();
+    display.setTextColor(WHITE);
+    display.setTextSize(1);
+    display.setCursor(0,0);
+    display.println(F("Booting up..."));
+    display.display();
   }
-  display.clearDisplay();
-  display.setTextColor(WHITE);
-  display.setTextSize(1);
-  display.setCursor(0,0);
-  display.println(F("Booting up..."));
-  display.display();
 
   // Init NVS (Preferences)
   preferences.begin("smartbin", false);
@@ -114,6 +118,13 @@ void setup() {
 }
 
 void loop() {
+  // Screen Saver Logic (turn off OLED after 30s of idle)
+  if (currentState == STATE_IDLE && !isScreenOff && (millis() - lastInteractionTime > 30000)) {
+    display.ssd1306_command(SSD1306_DISPLAYOFF);
+    isScreenOff = true;
+    Serial.println("Screen Saver Active (OLED off)");
+  }
+
   switch (currentState) {
     case STATE_IDLE:
       handleKeypadInput();
@@ -129,7 +140,23 @@ void loop() {
 
 void handleKeypadInput() {
   char key = keypad.getKey();
+  
+  // Serial fallback for testing without keypad
+  if (Serial.available() > 0) {
+    key = Serial.read();
+    if (key == '\n' || key == '\r') return;
+    key = toupper(key);
+  }
+
   if (key) {
+    // Wake up screen if necessary
+    if (isScreenOff) {
+      display.ssd1306_command(SSD1306_DISPLAYON);
+      isScreenOff = false;
+      Serial.println("Screen Woken Up");
+    }
+    lastInteractionTime = millis();
+
     if (key == '*' || key == '#') {
       currentInput = ""; // Clear input
       updateDisplay("ENTER OTP:");
@@ -137,6 +164,33 @@ void handleKeypadInput() {
     else if (key == 'A') {
       // Hidden calibration feature
       calibrateSensor();
+    }
+    else if (key == 'D') {
+      // On-Demand AP Setup Mode
+      updateDisplay("SETUP MODE");
+      Serial.println("\n--- SETUP MODE ---");
+      Serial.println("Starting Config Portal. Connect to 'SmartBin-Setup' Wi-Fi...");
+      
+      WiFiManager wm;
+      WiFiManagerParameter custom_box_id("boxid", "Smart Bin ID (e.g. BIN-001)", boxId, 40);
+      wm.addParameter(&custom_box_id);
+      wm.setSaveConfigCallback(saveConfigCallback);
+      wm.setConfigPortalTimeout(120); // 2 minutes
+      
+      if(wm.startConfigPortal("SmartBin-Setup")) {
+        if (shouldSaveConfig) {
+          strcpy(boxId, custom_box_id.getValue());
+          preferences.putString("boxId", String(boxId));
+          Serial.println(F("Saved new Box ID to NVS!"));
+        }
+        Serial.println("Setup complete, rebooting...");
+        delay(1000);
+        ESP.restart();
+      } else {
+        Serial.println("Setup mode timed out. Resuming normal operation.");
+      }
+      currentInput = "";
+      updateDisplay("ENTER OTP:");
     }
     else {
       currentInput += key;
@@ -237,8 +291,16 @@ void calibrateSensor() {
 void awaitDeposit() {
   long distance = getDistance();
   
-  // If distance drops significantly below baseline, the package has been deposited
-  if (distance > 0 && distance < (emptyBaselineDistance - 10)) {
+  // If distance drops significantly below baseline, OR user types 'Y' in Serial
+  bool simulatedDrop = false;
+  if (Serial.available() > 0) {
+    char c = toupper(Serial.read());
+    if (c == 'Y') simulatedDrop = true;
+  }
+
+  if ((distance > 0 && distance < (emptyBaselineDistance - 10)) || simulatedDrop) {
+    if (simulatedDrop) Serial.println("\n[SIMULATOR] Package drop detected via Serial!");
+    
     // Wait 5 seconds to ensure the courier removes their hand and closes the lid
     delay(5000); 
     digitalWrite(RELAY_PIN, LOW); // Retract Relay, locking the bin
@@ -247,11 +309,13 @@ void awaitDeposit() {
     delay(3000);
     
     currentState = STATE_IDLE;
+    lastInteractionTime = millis(); // Reset screen saver timer
     updateDisplay("ENTER OTP:");
   }
 }
 
 void updateDisplay(String msg) {
+  Serial.println("\n[DISPLAY] " + msg);
   display.clearDisplay();
   display.setCursor(0,0);
   display.println(msg);
