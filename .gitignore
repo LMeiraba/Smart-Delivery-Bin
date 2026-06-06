@@ -3,3 +3,6 @@ auth_info_baileys/
 .env
 .DS_Store
 *.log
+
+# Ignore ESP32 config containing sensitive URLs
+esp32_smart_bin/config.h

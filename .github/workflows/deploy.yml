@@ -33,6 +33,10 @@ jobs:
             
             # Restart PM2 process (or start it if it doesn't exist)
             pm2 restart delivery-box || pm2 start server.js --name delivery-box
+            
+            # Save the PM2 process list so it automatically restarts if the VM reboots
+            pm2 save
+            sudo pm2 startup
 
       - name: Notify on Failure
         if: failure()
@@ -40,7 +44,7 @@ jobs:
         with:
           webhook-url: ${{ secrets.DISCORD_WEBHOOK_URL }}
           content: "@everyone DEPLOYMENT FAILED! "
-          embed-description: "`api.meiraba.me` Check the GitHub Actions log for details: \n${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}"
+          embed-description: "The Smart Delivery Bin API deployment failed. Check the GitHub Actions log for details: \n${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}"
           embed-title: "Deployment FAILED!"
           embed-color: 15158332 # Red
 
@@ -50,6 +54,6 @@ jobs:
         with:
           webhook-url: ${{ secrets.DISCORD_WEBHOOK_URL }}
           content: "@everyone Deployment process successful!."
-          embed-description: "`api.meiraba.me` was updated with the latest push."
+          embed-description: "The Smart Delivery Bin API was successfully updated with the latest push."
           embed-title: "✅ Deployment Successful!"
           embed-color: 3066993
