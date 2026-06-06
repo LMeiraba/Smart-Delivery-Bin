@@ -140,6 +140,8 @@ app.get('/api/active-otps', (req, res) => {
     const keys = cache.keys();
     const active = keys.map(key => {
         const data = cache.get(key);
+        if (!data) return null;
+        
         // Calculate remaining TTL
         const ttl = cache.getTtl(key);
         const remainingSeconds = ttl ? Math.max(0, Math.floor((ttl - Date.now()) / 1000)) : 0;
@@ -153,7 +155,7 @@ app.get('/api/active-otps', (req, res) => {
             title: data.title,
             remainingSeconds
         };
-    });
+    }).filter(Boolean);
     res.json({ status: "success", data: active });
 });
 
