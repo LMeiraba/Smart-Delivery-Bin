@@ -3,6 +3,7 @@ import makeWASocket, { useMultiFileAuthState, DisconnectReason } from '@whiskeys
 import qrcode from 'qrcode-terminal';
 import pino from 'pino';
 import NodeCache from 'node-cache';
+import rateLimit from 'express-rate-limit';
 import path from 'path';
 import { fileURLToPath } from 'url';
 
@@ -54,7 +55,14 @@ connectToWhatsApp();
 
 // --- API ENDPOINTS ---
 
-app.post('/api/generate-otp', async (req, res) => {
+// Global API rate limiter (Max 5 OTP requests per IP every 5 minutes)
+const apiLimiter = rateLimit({
+    windowMs: 5 * 60 * 1000, // 5 minutes
+    max: 5, // Limit each IP to 5 requests per `window` (here, per 5 minutes)
+    message: { status: "error", message: "Too many OTP requests from this device. Please wait 5 minutes before trying again." }
+});
+
+app.post('/api/generate-otp', apiLimiter, async (req, res) => {
     const { phoneNumber, boxId, title, description } = req.body;
 
     if (!phoneNumber || !boxId) {
