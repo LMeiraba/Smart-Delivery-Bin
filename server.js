@@ -39,8 +39,11 @@ async function connectToWhatsApp() {
         
         if (connection === 'close') {
             const shouldReconnect = (lastDisconnect.error)?.output?.statusCode !== DisconnectReason.loggedOut;
-            console.log('Connection closed due to error. Reconnecting:', shouldReconnect);
-            if (shouldReconnect) connectToWhatsApp();
+            console.log('Connection closed due to error. Reconnecting in 5 seconds:', shouldReconnect);
+            if (shouldReconnect) {
+                // 5-second backoff to prevent tight loop OOM/CPU spikes
+                setTimeout(connectToWhatsApp, 5000); 
+            }
         } else if (connection === 'open') {
             console.log('WhatsApp Bot is connected and ready!');
         }
