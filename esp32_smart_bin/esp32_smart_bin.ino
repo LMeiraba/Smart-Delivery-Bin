@@ -101,7 +101,7 @@ void setup() {
   display.display();
 
   // This will try to connect. If it fails, it spins up an AP named "SmartBin-Setup"
-  if (!wm.autoConnect("SmartBin-Setup")) {
+  if (!wm.autoConnect("SmartBin-Setup", "Admin1234")) {
     Serial.println(F("Failed to connect and hit timeout"));
     delay(3000);
     ESP.restart();
@@ -177,7 +177,7 @@ void handleKeypadInput() {
       wm.setSaveConfigCallback(saveConfigCallback);
       wm.setConfigPortalTimeout(120); // 2 minutes
       
-      if(wm.startConfigPortal("SmartBin-Setup")) {
+      if(wm.startConfigPortal("SmartBin-Setup", "Admin1234")) {
         if (shouldSaveConfig) {
           strcpy(boxId, custom_box_id.getValue());
           preferences.putString("boxId", String(boxId));
@@ -218,20 +218,30 @@ void verifyOTP() {
   updateDisplay("VERIFYING...");
   
   if (WiFi.status() == WL_CONNECTED) {
+    Serial.println("\n[NETWORK] Wi-Fi is connected. Starting HTTPS request...");
     WiFiClientSecure client;
-    client.setInsecure(); // Bypass SSL verification to easily support HTTPS routing
-    HTTPClient http;
+    client.setInsecure(); // Bypass SSL verification
     
+    // Set a strict timeout so it never hangs indefinitely (10 seconds)
+    client.setTimeout(10); 
+    
+    HTTPClient http;
+    http.setTimeout(10000); // 10000 milliseconds = 10 seconds
+    
+    Serial.println("[NETWORK] Connecting to: " + String(API_URL));
     http.begin(client, API_URL);
     http.addHeader("Content-Type", "application/json");
 
     // Construct the JSON payload
     String payload = "{\"boxId\":\"" + String(boxId) + "\",\"enteredCode\":\"" + currentInput + "\"}";
+    Serial.println("[NETWORK] Sending Payload: " + payload);
     
     int httpResponseCode = http.POST(payload);
+    Serial.println("[NETWORK] HTTP Response Code: " + String(httpResponseCode));
 
     if (httpResponseCode == 200) {
       String response = http.getString();
+      Serial.println("[NETWORK] Server Response: " + response);
       if (response.indexOf("UNLOCK") > 0) {
         unlockBin();
         currentState = STATE_AWAIT_DEPOSIT;
@@ -239,8 +249,15 @@ void verifyOTP() {
         http.end();
         return;
       }
+    } else {
+      Serial.println("[NETWORK] Request failed or invalid OTP!");
+      if (httpResponseCode < 0) {
+        Serial.println("[NETWORK] Error: " + http.errorToString(httpResponseCode));
+      }
     }
     http.end();
+  } else {
+    Serial.println("\n[ERROR] Wi-Fi is NOT connected! Cannot verify OTP.");
   }
   
   // Failed or denied
