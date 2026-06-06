@@ -32,10 +32,10 @@ jobs:
             npm install
             
             # Restart PM2 process (or start it if it doesn't exist)
-            pm2 restart delivery-box || pm2 start server.js --name delivery-box
+            sudo pm2 restart delivery-box || sudo pm2 start server.js --name delivery-box
             
             # Save the PM2 process list so it automatically restarts if the VM reboots
-            pm2 save
+            sudo pm2 save
             sudo pm2 startup
 
       - name: Notify on Failure
