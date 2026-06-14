@@ -28,19 +28,26 @@ char keys[ROWS][COLS] = {
   {'*','0','#','D'}
 };
 byte rowPins[ROWS] = {19, 18, 5, 17};
-byte colPins[COLS] = {16, 4, 2, 15};
+byte colPins[COLS] = {16, 4, 27, 26}; // Avoided strapping pins 2 and 15
 Keypad keypad = Keypad(makeKeymap(keys), rowPins, colPins, ROWS, COLS);
 
-// Hardware
-#define RELAY_PIN 13
-#define TRIG_PIN 12
-#define ECHO_PIN 14
+// Hardware (Safe Pins)
+#define RELAY_PIN 23
+#define TRIG_PIN 25
+#define ECHO_PIN 34
+#define SWITCH_PIN 33
 
 // --- CONFIGURATION ---
 // API_URL is now securely defined in config.h
 Preferences preferences;
 char boxId[40] = "BIN-001";
+char ownerPhone[20] = "";
 long emptyBaselineDistance = 0;
+
+// Log & Limit Switch Timers
+unsigned long lidOpenedTime = 0;
+bool isLidOpen = false;
+bool leftOpenAlertSent = false;
 
 // State Machine
 enum State { STATE_IDLE, STATE_VERIFYING, STATE_AWAIT_DEPOSIT };
@@ -63,6 +70,7 @@ void setup() {
   digitalWrite(RELAY_PIN, LOW); // Locked by default
   pinMode(TRIG_PIN, OUTPUT);
   pinMode(ECHO_PIN, INPUT);
+  pinMode(SWITCH_PIN, INPUT_PULLUP);
 
   // Init OLED
   Wire.begin(OLED_SDA, OLED_SCL);
@@ -82,14 +90,18 @@ void setup() {
   preferences.begin("smartbin", false);
   String savedBoxId = preferences.getString("boxId", "BIN-001");
   savedBoxId.toCharArray(boxId, 40);
+  String savedPhone = preferences.getString("ownerPhone", "");
+  savedPhone.toCharArray(ownerPhone, 20);
   emptyBaselineDistance = preferences.getLong("baseline", 50); // Default 50cm calibration
 
   // Dual Mode / Captive Portal
   WiFiManager wm;
   
-  // Create a custom input field on the captive portal to ask for the Box ID
+  // Create custom input fields
   WiFiManagerParameter custom_box_id("boxid", "Smart Bin ID (e.g. BIN-001)", boxId, 40);
+  WiFiManagerParameter custom_owner_phone("ownerphone", "Owner WhatsApp (e.g. 919876543210)", ownerPhone, 20);
   wm.addParameter(&custom_box_id);
+  wm.addParameter(&custom_owner_phone);
   wm.setSaveConfigCallback(saveConfigCallback);
 
   display.clearDisplay();
@@ -111,7 +123,9 @@ void setup() {
   if (shouldSaveConfig) {
     strcpy(boxId, custom_box_id.getValue());
     preferences.putString("boxId", String(boxId));
-    Serial.println(F("Saved new Box ID to NVS!"));
+    strcpy(ownerPhone, custom_owner_phone.getValue());
+    preferences.putString("ownerPhone", String(ownerPhone));
+    Serial.println(F("Saved new config to NVS!"));
   }
 
   updateDisplay("ENTER OTP:");
@@ -123,6 +137,25 @@ void loop() {
     display.ssd1306_command(SSD1306_DISPLAYOFF);
     isScreenOff = true;
     Serial.println("Screen Saver Active (OLED off)");
+  }
+
+  // Limit Switch LID_LEFT_OPEN Logic
+  if (digitalRead(SWITCH_PIN) == HIGH) {
+    if (!isLidOpen) {
+      isLidOpen = true;
+      lidOpenedTime = millis();
+      leftOpenAlertSent = false;
+    } else if (!leftOpenAlertSent && (millis() - lidOpenedTime > 60000)) {
+      sendLogToServer("LID_LEFT_OPEN");
+      leftOpenAlertSent = true;
+    }
+  } else {
+    if (isLidOpen) {
+      isLidOpen = false;
+      if (leftOpenAlertSent) {
+        sendLogToServer("LID_CLOSED");
+      }
+    }
   }
 
   switch (currentState) {
@@ -173,7 +206,9 @@ void handleKeypadInput() {
       
       WiFiManager wm;
       WiFiManagerParameter custom_box_id("boxid", "Smart Bin ID (e.g. BIN-001)", boxId, 40);
+      WiFiManagerParameter custom_owner_phone("ownerphone", "Owner WhatsApp (e.g. 919876543210)", ownerPhone, 20);
       wm.addParameter(&custom_box_id);
+      wm.addParameter(&custom_owner_phone);
       wm.setSaveConfigCallback(saveConfigCallback);
       wm.setConfigPortalTimeout(120); // 2 minutes
       
@@ -181,7 +216,9 @@ void handleKeypadInput() {
         if (shouldSaveConfig) {
           strcpy(boxId, custom_box_id.getValue());
           preferences.putString("boxId", String(boxId));
-          Serial.println(F("Saved new Box ID to NVS!"));
+          strcpy(ownerPhone, custom_owner_phone.getValue());
+          preferences.putString("ownerPhone", String(ownerPhone));
+          Serial.println(F("Saved new config to NVS!"));
         }
         Serial.println("Setup complete, rebooting...");
         delay(1000);
@@ -211,6 +248,29 @@ void handleKeypadInput() {
         currentState = STATE_VERIFYING;
       }
     }
+  }
+}
+
+void sendLogToServer(String event, String details = "") {
+  if (WiFi.status() == WL_CONNECTED) {
+    WiFiClientSecure client;
+    client.setInsecure();
+    client.setTimeout(5); 
+    
+    HTTPClient http;
+    http.setTimeout(5000);
+    
+    String logUrl = String(API_URL);
+    logUrl.replace("verify-otp", "log"); // Hack to reuse config URL base
+    
+    http.begin(client, logUrl);
+    http.addHeader("Content-Type", "application/json");
+
+    String payload = "{\"boxId\":\"" + String(boxId) + "\",\"ownerPhone\":\"" + String(ownerPhone) + "\",\"event\":\"" + event + "\",\"details\":\"" + details + "\"}";
+    
+    int httpResponseCode = http.POST(payload);
+    Serial.println("[LOG SENDER] Event: " + event + " | Response: " + String(httpResponseCode));
+    http.end();
   }
 }
 
@@ -244,6 +304,7 @@ void verifyOTP() {
       Serial.println("[NETWORK] Server Response: " + response);
       if (response.indexOf("UNLOCK") > 0) {
         unlockBin();
+        sendLogToServer("OPEN_SUCCESS");
         currentState = STATE_AWAIT_DEPOSIT;
         currentInput = "";
         http.end();
@@ -261,6 +322,7 @@ void verifyOTP() {
   }
   
   // Failed or denied
+  sendLogToServer("OPEN_FAIL", "OTP: " + currentInput);
   updateDisplay("ACCESS DENIED");
   delay(3000);
   currentInput = "";
@@ -318,11 +380,18 @@ void awaitDeposit() {
   if ((distance > 0 && distance < (emptyBaselineDistance - 10)) || simulatedDrop) {
     if (simulatedDrop) Serial.println("\n[SIMULATOR] Package drop detected via Serial!");
     
-    // Wait 5 seconds to ensure the courier removes their hand and closes the lid
-    delay(5000); 
+    updateDisplay("CLOSE LID");
+    Serial.println("Waiting for limit switch to be pressed (lid closed)...");
+    
+    // Block infinitely until the limit switch is pressed (LOW)
+    while (digitalRead(SWITCH_PIN) == HIGH) {
+      delay(100);
+    }
+    
     digitalWrite(RELAY_PIN, LOW); // Retract Relay, locking the bin
     
     updateDisplay("SECURED!");
+    sendLogToServer("PACKAGE_DEPOSITED");
     delay(3000);
     
     currentState = STATE_IDLE;

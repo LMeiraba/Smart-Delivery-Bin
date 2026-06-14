@@ -55,6 +55,9 @@ connectToWhatsApp();
 
 // --- API ENDPOINTS ---
 
+// In-Memory Storage for Event Logs (max 500)
+const eventLogs = [];
+
 // Global API rate limiter (Max 5 OTP requests per IP every 5 minutes)
 const apiLimiter = rateLimit({
     windowMs: 5 * 60 * 1000, // 5 minutes
@@ -134,6 +137,47 @@ app.post('/api/verify-otp', (req, res) => {
         console.log(`[FAIL] Invalid OTP attempt for Box ${boxId}: ${enteredCode}`);
         res.status(401).json({ status: "fail", command: "KEEP_LOCKED" });
     }
+});
+
+// Rate limiter for Event Logging to prevent spam/WhatsApp bans
+const logLimiter = rateLimit({
+    windowMs: 1 * 60 * 1000, // 1 minute
+    max: 10, // Max 10 logs per IP per minute
+    message: { status: "error", message: "Too many log requests." }
+});
+
+app.post('/api/log', logLimiter, (req, res) => {
+    const { boxId, ownerPhone, event, details } = req.body;
+    
+    if (!boxId || !event) {
+        return res.status(400).json({ status: "error", message: "boxId and event are required" });
+    }
+
+    const logEntry = {
+        id: Date.now().toString(),
+        timestamp: new Date().toISOString(),
+        boxId,
+        ownerPhone: ownerPhone || "",
+        event,
+        details: details || ""
+    };
+
+    eventLogs.unshift(logEntry); // Add newest to front
+    if (eventLogs.length > 500) {
+        eventLogs.pop(); // Keep array size bounded
+    }
+
+    console.log(`[LOG] Box ${boxId} Event: ${event}`);
+
+    // TODO: Later integrate WhatsApp alerting here using sock.sendMessage
+    
+    res.json({ status: "success", message: "Log stored" });
+});
+
+app.get('/api/logs/:boxId', (req, res) => {
+    const { boxId } = req.params;
+    const boxLogs = eventLogs.filter(log => log.boxId === boxId);
+    res.json({ status: "success", data: boxLogs });
 });
 
 app.get('/api/active-otps', (req, res) => {
