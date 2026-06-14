@@ -10,12 +10,12 @@ wall = 3;
 // OLED Cutout
 oled_w = 26.5;
 oled_h = 14.5;
-oled_z = height - 25; 
+oled_z = 90; 
 
 // Keypad Ribbon Slit
 slit_w = 25;
 slit_h = 2;
-slit_z = oled_z - 45; 
+slit_z = 75; 
 
 // Solenoid Mount
 solenoid_w = 27;
@@ -48,10 +48,6 @@ module main_box() {
             // Inner hollow cavity
             translate([wall, wall, wall])
                 cube([width - 2*wall, depth - 2*wall, height]); 
-                
-            // OLED Cutout 
-            translate([width/2 - oled_w/2, -1, oled_z])
-                cube([oled_w, wall+2, oled_h]);
                 
             // Keypad Ribbon Slit
             translate([width/2 - slit_w/2, -1, slit_z])

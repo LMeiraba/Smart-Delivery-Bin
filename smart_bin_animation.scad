@@ -4,11 +4,12 @@
 
 /* --- Parameters --- */
 width = 200; depth = 150; height = 150; wall = 3;
-oled_w = 26.5; oled_h = 14.5; oled_z = height - 25; 
-slit_w = 25; slit_h = 2; slit_z = oled_z - 45; 
+oled_w = 26.5; oled_h = 14.5; oled_z = 90; 
+slit_w = 25; slit_h = 2; slit_z = 75; 
 solenoid_w = 27; solenoid_d = 15;
 sensor_hole_d = 16; sensor_spacing = 25.5;
 hinge_r = 5; hinge_hole_r = 1.5; hinge_w = 15;
+hinge_d = 10;
 
 // --- Animation Math ---
 angle = 110 * (0.5 - 0.5 * cos($t * 360));
@@ -91,7 +92,6 @@ module main_box() {
             cube([width, depth, height]);
             // Inner hollow cavity (Starts at Z=-1 to remove the floor!)
             translate([wall, wall, -1]) cube([width - 2*wall, depth - 2*wall, height + 2]); 
-            translate([width/2 - oled_w/2, -1, oled_z]) cube([oled_w, wall+2, oled_h]);
             translate([width/2 - slit_w/2, -1, slit_z]) cube([slit_w, wall+2, slit_h]);
             // Wire Routing Hole (Moved near the top left wall to avoid the breadboard)
             translate([-1, depth/2, height - 20]) rotate([0, 90, 0]) cylinder(d=20, h=wall+2, $fn=32);
@@ -120,8 +120,8 @@ module main_box() {
     translate([-2, depth/2 + 20, height/2]) rotate([0, -90, 0]) translate([-82/2, -55/2, 0]) dummy_esp32();
     translate([-1.5, depth/2 - 30, height/2]) rotate([0, -90, 0]) translate([-43/2, -17/2, 0]) dummy_relay();
     
-    // OLED moved to the OUTSIDE front wall
-    translate([width/2, -1.5, oled_z + oled_h/2]) rotate([-90, 0, 0]) translate([-27/2, -27/2, 0]) dummy_oled();
+    // OLED screen is INSIDE the box (per user request)
+    translate([-1.5, depth/2 - 60, height/2]) rotate([0, -90, 0]) translate([-27/2, -27/2, 0]) dummy_oled();
     translate([width/2, -1, slit_z - 35]) rotate([90, 0, 0]) translate([-77/2, -70/2, 0]) dummy_keypad();
     
     // The Solenoid Lock (Lowered by 5mm to prevent its metal flange from smashing into the lid!)
