@@ -53,6 +53,51 @@ async function connectToWhatsApp() {
 
 connectToWhatsApp();
 
+// --- WHATSAPP MESSAGE POOLING ---
+const messageQueue = new Map(); // Stores pending events per phone number
+
+setInterval(async () => {
+    if (!sock) return; // Wait until WhatsApp is fully connected
+    
+    if (messageQueue.size === 0) return;
+
+    for (const [phone, events] of messageQueue.entries()) {
+        if (events.length === 0) continue;
+        
+        const chatId = `${phone}@s.whatsapp.net`;
+        // We'll just grab the boxId from the first event for the title
+        const boxId = events[0].boxId; 
+        
+        let msg = `📦 *Smart Bin Activity Report*\n\n*${events.length} New Event(s) for ${boxId}:*\n`;
+        
+        events.forEach(e => {
+            // Format time for India timezone (IST)
+            const timeString = new Date(e.timestamp).toLocaleTimeString('en-IN', { timeZone: 'Asia/Kolkata', hour: '2-digit', minute:'2-digit' });
+            
+            let icon = "🔹";
+            if (e.event === "OPEN_SUCCESS") icon = "🟢";
+            else if (e.event === "OPEN_FAIL") icon = "❌";
+            else if (e.event === "PACKAGE_DEPOSITED") icon = "📦";
+            else if (e.event === "LID_LEFT_OPEN") icon = "⚠️";
+            else if (e.event === "LID_CLOSED") icon = "🔒";
+            
+            msg += `- [${timeString}] ${icon} ${e.event}`;
+            if (e.details) msg += ` (${e.details})`;
+            msg += `\n`;
+        });
+        
+        try {
+            await sock.sendMessage(chatId, { text: msg });
+            console.log(`[WHATSAPP] Sent pooled report to ${phone} with ${events.length} events.`);
+        } catch (error) {
+            console.error(`[WHATSAPP] Failed to send pooled report to ${phone}:`, error);
+        }
+    }
+    
+    // Clear the queue after sending
+    messageQueue.clear();
+}, 60000); // Run exactly every 60 seconds
+
 // --- API ENDPOINTS ---
 
 // In-Memory Storage for Event Logs (max 500)
@@ -169,9 +214,18 @@ app.post('/api/log', logLimiter, (req, res) => {
 
     console.log(`[LOG] Box ${boxId} Event: ${event}`);
 
-    // TODO: Later integrate WhatsApp alerting here using sock.sendMessage
+    // Add to WhatsApp queue if ownerPhone is provided
+    if (ownerPhone && ownerPhone.length >= 10) {
+        let cleanPhone = ownerPhone.replace(/[\+\s\-]/g, '');
+        if (cleanPhone.length === 10) cleanPhone = "91" + cleanPhone;
+        
+        if (!messageQueue.has(cleanPhone)) {
+            messageQueue.set(cleanPhone, []);
+        }
+        messageQueue.get(cleanPhone).push(logEntry);
+    }
     
-    res.json({ status: "success", message: "Log stored" });
+    res.json({ status: "success", message: "Log stored and queued for WhatsApp" });
 });
 
 app.get('/api/logs', (req, res) => {
