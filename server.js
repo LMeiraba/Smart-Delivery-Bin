@@ -174,6 +174,12 @@ app.post('/api/log', logLimiter, (req, res) => {
     res.json({ status: "success", message: "Log stored" });
 });
 
+app.get('/api/logs', (req, res) => {
+    // Return a list of all unique Box IDs that currently have logs
+    const uniqueBoxes = [...new Set(eventLogs.map(log => log.boxId))];
+    res.json({ status: "success", data: uniqueBoxes });
+});
+
 app.get('/api/logs/:boxId', (req, res) => {
     const { boxId } = req.params;
     const boxLogs = eventLogs.filter(log => log.boxId === boxId);

@@ -62,6 +62,29 @@ void saveConfigCallback() {
   shouldSaveConfig = true;
 }
 
+void sendLogToServer(String event, String details = "") {
+  if (WiFi.status() == WL_CONNECTED) {
+    WiFiClientSecure client;
+    client.setInsecure();
+    client.setTimeout(5); 
+    
+    HTTPClient http;
+    http.setTimeout(5000);
+    
+    String logUrl = String(API_URL);
+    logUrl.replace("verify-otp", "log"); // Hack to reuse config URL base
+    
+    http.begin(client, logUrl);
+    http.addHeader("Content-Type", "application/json");
+
+    String payload = "{\"boxId\":\"" + String(boxId) + "\",\"ownerPhone\":\"" + String(ownerPhone) + "\",\"event\":\"" + event + "\",\"details\":\"" + details + "\"}";
+    
+    int httpResponseCode = http.POST(payload);
+    Serial.println("[LOG SENDER] Event: " + event + " | Response: " + String(httpResponseCode));
+    http.end();
+  }
+}
+
 void setup() {
   Serial.begin(115200);
   
@@ -248,29 +271,6 @@ void handleKeypadInput() {
         currentState = STATE_VERIFYING;
       }
     }
-  }
-}
-
-void sendLogToServer(String event, String details = "") {
-  if (WiFi.status() == WL_CONNECTED) {
-    WiFiClientSecure client;
-    client.setInsecure();
-    client.setTimeout(5); 
-    
-    HTTPClient http;
-    http.setTimeout(5000);
-    
-    String logUrl = String(API_URL);
-    logUrl.replace("verify-otp", "log"); // Hack to reuse config URL base
-    
-    http.begin(client, logUrl);
-    http.addHeader("Content-Type", "application/json");
-
-    String payload = "{\"boxId\":\"" + String(boxId) + "\",\"ownerPhone\":\"" + String(ownerPhone) + "\",\"event\":\"" + event + "\",\"details\":\"" + details + "\"}";
-    
-    int httpResponseCode = http.POST(payload);
-    Serial.println("[LOG SENDER] Event: " + event + " | Response: " + String(httpResponseCode));
-    http.end();
   }
 }
 
