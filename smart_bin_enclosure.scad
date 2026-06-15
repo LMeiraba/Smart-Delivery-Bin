@@ -71,7 +71,8 @@ module main_box() {
         // Push Button Pocket (Limit Switch)
         // A U-shaped pocket that bridges perfectly when printed upside down!
         // Gives a 13x12mm recessed platform so a 12mm button sticks up exactly 1mm to be pressed by the lid.
-        translate([20, wall, height - 14]) {
+        // Moved to the back wall so the heavy lid acts as a lever and easily depresses it!
+        translate([20, depth - wall - 12, height - 14]) {
             cube([17, 12, 3]); // The shelf (bridges the gap)
             translate([0, 0, 3]) cube([2, 12, 11]); // Left pocket wall
             translate([15, 0, 3]) cube([2, 12, 11]); // Right pocket wall

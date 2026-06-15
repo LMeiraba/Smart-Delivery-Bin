@@ -109,7 +109,7 @@ module main_box() {
         }
         
         // Push Button Pocket (Limit Switch)
-        translate([20, wall, height - 14]) {
+        translate([20, depth - wall - 12, height - 14]) {
             cube([17, 12, 3]); 
             translate([0, 0, 3]) cube([2, 12, 11]); 
             translate([15, 0, 3]) cube([2, 12, 11]); 
@@ -129,8 +129,9 @@ module main_box() {
     
     // The Limit Switch (Push Button)
     // The cap mathematically compresses by up to 1mm exactly when the heavy lid swings down onto it
-    button_pressed = max(0, 1 - 146 * sin(angle));
-    translate([23.5, wall + 1, height - 11]) dummy_pushbutton(button_pressed);
+    // Now positioned near the hinge (lever fulcrum) so the lid effortlessly presses it!
+    button_pressed = max(0, 1 - 10 * sin(angle));
+    translate([23.5, depth - wall - 11, height - 11]) dummy_pushbutton(button_pressed);
 }
 
 module lid() {
