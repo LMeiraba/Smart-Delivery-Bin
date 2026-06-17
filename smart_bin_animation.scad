@@ -114,6 +114,20 @@ module main_box() {
             translate([0, 0, 3]) cube([2, 12, 11]); 
             translate([15, 0, 3]) cube([2, 12, 11]); 
         }
+        
+        // Latch Catch for Lid-Mounted Solenoid
+        translate([width/2 - 15, wall, height - 25]) {
+            difference() {
+                union() {
+                    cube([30, 11, 25]);
+                    hull() {
+                        cube([30, 11, 0.1]);
+                        translate([0, 0, -11]) cube([30, 0.1, 0.1]);
+                    }
+                }
+                translate([10, -1, 7]) cube([10, 13, 12]);
+            }
+        }
     }
     
     // Virtual Electronic Components attached to the box
@@ -123,9 +137,6 @@ module main_box() {
     // OLED screen is INSIDE the box (per user request)
     translate([-1.5, depth/2 - 60, height/2]) rotate([0, -90, 0]) translate([-27/2, -27/2, 0]) dummy_oled();
     translate([width/2, -1, slit_z - 35]) rotate([90, 0, 0]) translate([-77/2, -70/2, 0]) dummy_keypad();
-    
-    // The Solenoid Lock (Lowered by 5mm to prevent its metal flange from smashing into the lid!)
-    translate([width/2 + 2, wall, height - 26.5]) dummy_solenoid(tongue_x);
     
     // The Limit Switch (Push Button)
     // The cap mathematically compresses by up to 1mm exactly when the heavy lid swings down onto it
@@ -150,16 +161,12 @@ module lid() {
         translate([3*width/4 + hinge_w/2 + 0.5, depth, 0]) rotate([0, 90, 0]) hinge_knuckle();
         translate([3*width/4 - hinge_w*1.5 - 0.5, depth, 0]) rotate([0, 90, 0]) hinge_knuckle();
         
-        // Latch Hook (Shifted right in CAD, so when the lid flips over, it ends up on the left!)
-        translate([width/2, wall + 0.5, wall - 1]) {
-            difference() {
-                // Elongated to 31mm so it reaches the lowered Solenoid lock
-                cube([20, 10, 31]);
-                // Hole must be open on the LEFT in CAD, so it is open on the RIGHT when flipped!
-                translate([-1, 2, 14]) cube([17, 6, 12]); 
-            }
-        }
+        // Solenoid Mounting Block
+        translate([width/2 - 15, wall + 6, -5]) cube([30, 35, 5]);
     }
+    
+    // The actual Solenoid Lock (now mounted to the bottom of the lid!)
+    translate([width/2 + 2.5, wall + 12, -20]) rotate([0, 0, 90]) dummy_solenoid(tongue_x);
     
     // Virtual HC-SR04 Sensor attached to the lid
     // Pointing INTO the box (+Z in local lid space, which becomes DOWN when closed)

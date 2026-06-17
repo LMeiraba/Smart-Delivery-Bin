@@ -60,8 +60,25 @@ module main_box() {
                 cylinder(d=20, h=wall+2, $fn=32);
         }
         
-        // The metal 12V Solenoid Lock will be screwed directly to the inside front wall here.
-        // (Placeholder block removed so it doesn't physically block the actual lock!)
+        // The metal 12V Latching Solenoid will be mounted on the lid now!
+        
+        // Latch Catch for Lid-Mounted Solenoid
+        // This block catches the slanted tongue when it springs out!
+        translate([width/2 - 15, wall, height - 25]) {
+            difference() {
+                union() {
+                    // Solid catch block attached to the front wall
+                    cube([30, 11, 25]);
+                    // 45-degree wedge underneath so it prints perfectly without supports!
+                    hull() {
+                        cube([30, 11, 0.1]);
+                        translate([0, 0, -11]) cube([30, 0.1, 0.1]);
+                    }
+                }
+                // Rectangular hole for the tongue to snap into
+                translate([10, -1, 7]) cube([10, 13, 12]);
+            }
+        }
             
         // Box Hinges (Back wall, top edge)
         // Overlap perfectly with the back wall
@@ -101,15 +118,8 @@ module lid() {
         translate([3*width/4 + hinge_w/2 + 0.5, depth, 0]) rotate([0, 90, 0]) hinge_knuckle();
         translate([3*width/4 - hinge_w*1.5 - 0.5, depth, 0]) rotate([0, 90, 0]) hinge_knuckle();
         
-        // Latch Hook (Shifted right in CAD, so when the lid flips over, it ends up on the left!)
-        translate([width/2, wall + 0.5, wall - 1]) {
-            difference() {
-                // Elongated to 31mm so it reaches the lowered Solenoid lock
-                cube([20, 10, 31]);
-                // Hole must be open on the LEFT in CAD, so it is open on the RIGHT when flipped!
-                translate([-1, 2, 12]) cube([17, 6, 12]); 
-            }
-        }
+        // Solenoid Mounting Block (Lowers the solenoid for a stronger catch)
+        translate([width/2 - 15, wall + 6, -5]) cube([30, 35, 5]);
     }
 }
 
