@@ -2,10 +2,10 @@
 // All dimensions in millimeters (mm)
 
 /* --- Parameters --- */
-width = 200;
-depth = 150;
-height = 150;
-wall = 3;
+width = 150;
+depth = 110;
+height = 110;
+wall = 2;
 
 // OLED Cutout
 oled_w = 26.5;
@@ -80,10 +80,10 @@ module main_box() {
             }
         }
             
-        // Box Hinges (Back wall, top edge)
-        // Overlap perfectly with the back wall
-        translate([width/4 - hinge_w/2, depth, height]) rotate([0, 90, 0]) hinge_knuckle();
-        translate([3*width/4 - hinge_w/2, depth, height]) rotate([0, 90, 0]) hinge_knuckle();
+        // Box Hinges
+        // Shifted out to exactly depth + 3 so the cylinder perfectly touches the inner wall without protruding!
+        translate([width/4 - hinge_w/2, depth + 3, height - 3]) rotate([0, 90, 0]) hinge_knuckle();
+        translate([3*width/4 - hinge_w/2, depth + 3, height - 3]) rotate([0, 90, 0]) hinge_knuckle();
         
         // Push Button Pocket (Limit Switch)
         // A U-shaped pocket that bridges perfectly when printed upside down!
@@ -110,22 +110,17 @@ module lid() {
                 cube([width - 2*wall - 1, depth - 2*wall - 1, 5.1]);
                 translate([wall, wall, -1]) cube([width - 4*wall - 1, depth - 4*wall - 1, 7.1]); 
             }
-            
-        // Lid Hinges (Back wall)
-        translate([width/4 + hinge_w/2 + 0.5, depth, 0]) rotate([0, 90, 0]) hinge_knuckle();
-        translate([width/4 - hinge_w*1.5 - 0.5, depth, 0]) rotate([0, 90, 0]) hinge_knuckle();
+        // Lid Hinges
+        // Shifted to depth + 3 to align with the box hinges
+        translate([width/4 + hinge_w/2 + 0.5, depth + 3, 5]) rotate([0, 90, 0]) hinge_knuckle();
+        translate([width/4 - hinge_w*1.5 - 0.5, depth + 3, 5]) rotate([0, 90, 0]) hinge_knuckle();
         
-        translate([3*width/4 + hinge_w/2 + 0.5, depth, 0]) rotate([0, 90, 0]) hinge_knuckle();
-        translate([3*width/4 - hinge_w*1.5 - 0.5, depth, 0]) rotate([0, 90, 0]) hinge_knuckle();
+        translate([3*width/4 + hinge_w/2 + 0.5, depth + 3, 5]) rotate([0, 90, 0]) hinge_knuckle();
+        translate([3*width/4 - hinge_w*1.5 - 0.5, depth + 3, 5]) rotate([0, 90, 0]) hinge_knuckle();
         
-        // Solenoid Mounting Block (Lowers the solenoid for a stronger catch)
-        translate([width/2 - 15, wall + 6, -5]) cube([30, 35, 5]);
+        // Solenoid Mounting Block (Now pointing UP in local space so the lid is flat on the bottom!)
+        translate([width/2 - 15, wall + 6, wall]) cube([30, 35, 5]);
     }
 }
 
-// --- Render Setup ---
-main_box();
 
-// Move lid to the side for printing
-translate([0, depth + 15, 0])
-    lid();

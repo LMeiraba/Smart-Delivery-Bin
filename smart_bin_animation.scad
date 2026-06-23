@@ -3,7 +3,10 @@
 // Set FPS: 30, Steps: 100
 
 /* --- Parameters --- */
-width = 200; depth = 150; height = 150; wall = 3;
+width = 150;
+depth = 110;
+height = 110;
+wall = 2;
 oled_w = 26.5; oled_h = 14.5; oled_z = 90; 
 slit_w = 25; slit_h = 2; slit_z = 75; 
 solenoid_w = 27; solenoid_d = 15;
@@ -99,14 +102,10 @@ module main_box() {
             // Delete the entire right wall for animation visibility!
             translate([width - wall - 1, -1, -1]) cube([wall + 3, depth + 2, height + 2]);
         }
-        translate([width/4 - hinge_w/2, depth, height]) difference() {
-            translate([0, -hinge_d/2 + 0.5, -hinge_d/2]) cube([hinge_w, hinge_d/2, hinge_d]);
-            rotate([0, 90, 0]) cylinder(d=hinge_d, h=hinge_w, $fn=32);
-        }
-        translate([3*width/4 - hinge_w/2, depth, height]) difference() {
-            translate([0, -hinge_d/2 + 0.5, -hinge_d/2]) cube([hinge_w, hinge_d/2, hinge_d]);
-            rotate([0, 90, 0]) cylinder(d=hinge_d, h=hinge_w, $fn=32);
-        }
+        
+        // Box Hinges
+        translate([width/4 - hinge_w/2, depth + 3, height - 3]) rotate([0, 90, 0]) hinge_knuckle();
+        translate([3*width/4 - hinge_w/2, depth + 3, height - 3]) rotate([0, 90, 0]) hinge_knuckle();
         
         // Push Button Pocket (Limit Switch)
         translate([20, depth - wall - 12, height - 14]) {
@@ -140,7 +139,6 @@ module main_box() {
     
     // The Limit Switch (Push Button)
     // The cap mathematically compresses by up to 1mm exactly when the heavy lid swings down onto it
-    // Now positioned near the hinge (lever fulcrum) so the lid effortlessly presses it!
     button_pressed = max(0, 1 - 10 * sin(angle));
     translate([23.5, depth - wall - 11, height - 11]) dummy_pushbutton(button_pressed);
 }
@@ -156,27 +154,27 @@ module lid() {
                 cube([width - 2*wall - 1, depth - 2*wall - 1, 5.1]);
                 translate([wall, wall, -1]) cube([width - 4*wall - 1, depth - 4*wall - 1, 7.1]); 
             }
-        translate([width/4 + hinge_w/2 + 0.5, depth, 0]) rotate([0, 90, 0]) hinge_knuckle();
-        translate([width/4 - hinge_w*1.5 - 0.5, depth, 0]) rotate([0, 90, 0]) hinge_knuckle();
-        translate([3*width/4 + hinge_w/2 + 0.5, depth, 0]) rotate([0, 90, 0]) hinge_knuckle();
-        translate([3*width/4 - hinge_w*1.5 - 0.5, depth, 0]) rotate([0, 90, 0]) hinge_knuckle();
+            
+        translate([width/4 + hinge_w/2 + 0.5, depth + 3, 5]) rotate([0, 90, 0]) hinge_knuckle();
+        translate([width/4 - hinge_w*1.5 - 0.5, depth + 3, 5]) rotate([0, 90, 0]) hinge_knuckle();
+        translate([3*width/4 + hinge_w/2 + 0.5, depth + 3, 5]) rotate([0, 90, 0]) hinge_knuckle();
+        translate([3*width/4 - hinge_w*1.5 - 0.5, depth + 3, 5]) rotate([0, 90, 0]) hinge_knuckle();
         
         // Solenoid Mounting Block
-        translate([width/2 - 15, wall + 6, -5]) cube([30, 35, 5]);
+        translate([width/2 - 15, wall + 6, wall]) cube([30, 35, 5]);
     }
     
     // The actual Solenoid Lock (now mounted to the bottom of the lid!)
-    translate([width/2 + 2.5, wall + 12, -20]) rotate([0, 0, 90]) dummy_solenoid(tongue_x);
+    translate([width/2 + 2.5, wall + 12, wall + 5]) rotate([0, 0, 90]) dummy_solenoid(tongue_x);
     
     // Virtual HC-SR04 Sensor attached to the lid
-    // Pointing INTO the box (+Z in local lid space, which becomes DOWN when closed)
     translate([width/2, depth/2, wall]) translate([-45/2, -10, 0]) dummy_hcsr04();
 }
 
 // --- Render ---
 main_box();
 
-translate([0, depth, height])
+translate([0, depth + 3, height - 3])
     rotate([-angle, 0, 0])
-    translate([0, -depth, 0])
+    translate([0, -(depth + 3), 5])
         translate([width, 0, 0]) rotate([0, 180, 0]) lid();
