@@ -6,7 +6,7 @@
 width = 150;
 depth = 110;
 height = 110;
-wall = 2;
+wall = 1.6;
 oled_w = 26.5; oled_h = 14.5; oled_z = 90; 
 slit_w = 25; slit_h = 2; slit_z = 75; 
 solenoid_w = 27; solenoid_d = 15;
@@ -93,8 +93,8 @@ module main_box() {
     union() {
         difference() {
             cube([width, depth, height]);
-            // Inner hollow cavity (Starts at Z=-1 to remove the floor!)
-            translate([wall, wall, -1]) cube([width - 2*wall, depth - 2*wall, height + 2]); 
+            // Inner hollow cavity
+            translate([wall, wall, wall]) cube([width - 2*wall, depth - 2*wall, height]); 
             translate([width/2 - slit_w/2, -1, slit_z]) cube([slit_w, wall+2, slit_h]);
             // Wire Routing Hole (Moved near the top left wall to avoid the breadboard)
             translate([-1, depth/2, height - 20]) rotate([0, 90, 0]) cylinder(d=20, h=wall+2, $fn=32);
@@ -115,16 +115,16 @@ module main_box() {
         }
         
         // Latch Catch for Lid-Mounted Solenoid
-        translate([width/2 - 15, wall, height - 25]) {
+        translate([width/2 - 15, wall, height - 19]) {
             difference() {
                 union() {
-                    cube([30, 11, 25]);
+                    cube([30, 11, 19]);
                     hull() {
                         cube([30, 11, 0.1]);
                         translate([0, 0, -11]) cube([30, 0.1, 0.1]);
                     }
                 }
-                translate([10, -1, 7]) cube([10, 13, 12]);
+                translate([10, -1, 1]) cube([10, 13, 12]);
             }
         }
     }
