@@ -14,11 +14,12 @@
 // OLED I2C
 #define SCREEN_WIDTH 128
 #define SCREEN_HEIGHT 64
-#define OLED_SDA 21
-#define OLED_SCL 22
+// Custom I2C pins for OLED on the left side
+#define OLED_SDA 27
+#define OLED_SCL 26
 Adafruit_SSD1306 display(SCREEN_WIDTH, SCREEN_HEIGHT, &Wire, -1);
 
-// Keypad
+// Keypad (All 8 pins contiguously on the RIGHT side - BOOT button side)
 const byte ROWS = 4;
 const byte COLS = 4;
 char keys[ROWS][COLS] = {
@@ -27,15 +28,15 @@ char keys[ROWS][COLS] = {
   {'7','8','9','C'},
   {'*','0','#','D'}
 };
-byte rowPins[ROWS] = {19, 18, 5, 17};
-byte colPins[COLS] = {16, 4, 27, 26}; // Avoided strapping pins 2 and 15
+byte rowPins[ROWS] = {15, 4, 16, 17}; 
+byte colPins[COLS] = {5, 18, 19, 23}; 
 Keypad keypad = Keypad(makeKeymap(keys), rowPins, colPins, ROWS, COLS);
 
-// Hardware (Safe Pins)
-#define RELAY_PIN 23
-#define TRIG_PIN 25
-#define ECHO_PIN 34
-#define SWITCH_PIN 33
+// Hardware (All other components moved to the LEFT side)
+#define RELAY_PIN 25
+#define TRIG_PIN 33
+#define ECHO_PIN 32
+#define SWITCH_PIN 14
 
 // --- CONFIGURATION ---
 // API_URL is now securely defined in config.h
@@ -97,12 +98,13 @@ void setup() {
 
   // Init OLED
   Wire.begin(OLED_SDA, OLED_SCL);
+  
   if(!display.begin(SSD1306_SWITCHCAPVCC, 0x3C)) {
     Serial.println(F("SSD1306 allocation failed. Running in Serial-only mode."));
     // Removed infinite loop so we can test without OLED
   } else {
     display.clearDisplay();
-    display.setTextColor(WHITE);
+    display.setTextColor(SSD1306_WHITE);
     display.setTextSize(1);
     display.setCursor(0,0);
     display.println(F("Booting up..."));
@@ -128,15 +130,19 @@ void setup() {
   wm.setSaveConfigCallback(saveConfigCallback);
 
   display.clearDisplay();
+  display.setTextSize(1);
   display.setCursor(0,0);
-  display.println(F("Connecting to WiFi..."));
-  display.println(F("If no connection,"));
-  display.println(F("connect to AP:"));
-  display.println(F("SmartBin-Setup"));
+  display.println(F("SMART BIN SETUP"));
+  display.drawLine(0, 10, 128, 10, SSD1306_WHITE);
+  
+  display.setCursor(0, 18);
+  display.println(F("Connecting to WiFi.."));
+  display.println(F("If failed, join AP:"));
+  display.println(F("> SmartBin-Setup"));
   display.display();
 
-  // This will try to connect. If it fails, it spins up an AP named "SmartBin-Setup"
-  if (!wm.autoConnect("SmartBin-Setup", "Admin1234")) {
+  // This will try to connect. If it fails, it spins up an AP named "SmartBin-Setup" with password "12345678"
+  if (!wm.autoConnect("SmartBin-Setup", "12345678")) {
     Serial.println(F("Failed to connect and hit timeout"));
     delay(3000);
     ESP.restart();
@@ -168,6 +174,15 @@ void loop() {
       isLidOpen = true;
       lidOpenedTime = millis();
       leftOpenAlertSent = false;
+      
+      if (currentState == STATE_IDLE) {
+        sendLogToServer("TAMPER_ALERT", "Lid forced open without OTP!");
+        // Optional: Rapidly toggle relay to make noise
+        for (int i = 0; i < 5; i++) {
+          digitalWrite(RELAY_PIN, HIGH); delay(100);
+          digitalWrite(RELAY_PIN, LOW); delay(100);
+        }
+      }
     } else if (!leftOpenAlertSent && (millis() - lidOpenedTime > 60000)) {
       sendLogToServer("LID_LEFT_OPEN");
       leftOpenAlertSent = true;
@@ -177,6 +192,12 @@ void loop() {
       isLidOpen = false;
       if (leftOpenAlertSent) {
         sendLogToServer("LID_CLOSED");
+      }
+      // Check Capacity on close
+      delay(1000); // Wait for packages to settle
+      long currentDist = getDistance();
+      if (currentDist > 0 && currentDist < (emptyBaselineDistance * 0.25)) {
+        sendLogToServer("BIN_FULL", "Capacity > 75% full");
       }
     }
   }
@@ -233,37 +254,74 @@ void handleKeypadInput() {
       wm.addParameter(&custom_box_id);
       wm.addParameter(&custom_owner_phone);
       wm.setSaveConfigCallback(saveConfigCallback);
-      wm.setConfigPortalTimeout(120); // 2 minutes
       
-      if(wm.startConfigPortal("SmartBin-Setup", "Admin1234")) {
+      wm.setConfigPortalBlocking(false); // Make it non-blocking so we can read keypad
+      wm.startConfigPortal("SmartBin-Setup", "12345678");
+      
+      unsigned long setupStartTime = millis();
+      
+      // Keep portal alive for 2 minutes or until user cancels
+      while (millis() - setupStartTime < 120000) {
+        wm.process(); // Handle web traffic
+        
+        char cancelKey = keypad.getKey();
+        if (cancelKey == '*' || cancelKey == '#') {
+          Serial.println("Setup Mode Cancelled by Keypad!");
+          updateDisplay("CANCELLING...");
+          delay(1000);
+          ESP.restart();
+        }
+        
         if (shouldSaveConfig) {
           strcpy(boxId, custom_box_id.getValue());
           preferences.putString("boxId", String(boxId));
           strcpy(ownerPhone, custom_owner_phone.getValue());
           preferences.putString("ownerPhone", String(ownerPhone));
           Serial.println(F("Saved new config to NVS!"));
+          
+          updateDisplay("SAVED! REBOOTING");
+          delay(2000);
+          ESP.restart();
         }
-        Serial.println("Setup complete, rebooting...");
-        delay(1000);
-        ESP.restart();
-      } else {
-        Serial.println("Setup mode timed out. Resuming normal operation.");
+        
+        delay(10); // Yield
       }
-      currentInput = "";
-      updateDisplay("ENTER OTP:");
+      
+      Serial.println("Setup Mode Timeout!");
+      ESP.restart();
     }
     else {
       currentInput += key;
       
-      // Masking the display input for security
-      String masked = "";
-      for (int i=0; i<currentInput.length(); i++) masked += "*";
-      
+      // Show unmasked input for better UX
       display.clearDisplay();
+      
+      // Top Status Bar
+      display.setTextSize(1);
       display.setCursor(0,0);
-      display.println(F("ENTER OTP:"));
+      display.print(boxId);
+      display.setCursor(100,0);
+      if (WiFi.status() == WL_CONNECTED) display.print("WiFi");
+      else display.print("...");
+      
+      display.drawLine(0, 10, 128, 10, SSD1306_WHITE);
+      
+      // OTP Entry
+      display.setCursor(0, 25);
+      display.println(F("Enter OTP:"));
+      
       display.setTextSize(2);
-      display.println(masked);
+      display.setCursor(0, 42);
+      
+      // Draw OTP with underscores for empty slots
+      String displayStr = "";
+      for (int i=0; i<4; i++) {
+        if (i < currentInput.length()) displayStr += currentInput.charAt(i);
+        else displayStr += "_";
+        if (i < 3) displayStr += " ";
+      }
+      display.print(displayStr);
+      
       display.setTextSize(1);
       display.display();
 
@@ -306,6 +364,7 @@ void verifyOTP() {
         unlockBin();
         sendLogToServer("OPEN_SUCCESS");
         currentState = STATE_AWAIT_DEPOSIT;
+        lastInteractionTime = millis(); // Start auto-relock timer
         currentInput = "";
         http.end();
         return;
@@ -368,6 +427,17 @@ void calibrateSensor() {
 }
 
 void awaitDeposit() {
+  // Auto-Relock if left alone for 30 seconds
+  if (millis() - lastInteractionTime > 30000 && digitalRead(SWITCH_PIN) == LOW) {
+      digitalWrite(RELAY_PIN, LOW); // Lock
+      sendLogToServer("AUTO_RELOCKED", "Lid not opened in 30s");
+      updateDisplay("RELOCKED!");
+      delay(2000);
+      currentState = STATE_IDLE;
+      updateDisplay("Enter OTP:");
+      return;
+  }
+
   long distance = getDistance();
   
   // If distance drops significantly below baseline, OR user types 'Y' in Serial
@@ -403,7 +473,20 @@ void awaitDeposit() {
 void updateDisplay(String msg) {
   Serial.println("\n[DISPLAY] " + msg);
   display.clearDisplay();
+  
+  // Top Status Bar
+  display.setTextSize(1);
   display.setCursor(0,0);
+  display.print(boxId);
+  display.setCursor(100,0);
+  if (WiFi.status() == WL_CONNECTED) display.print("WiFi");
+  else display.print("...");
+  
+  display.drawLine(0, 10, 128, 10, WHITE);
+  
+  display.setCursor(0, 25);
+  display.setTextSize(2);
   display.println(msg);
+  display.setTextSize(1);
   display.display();
 }

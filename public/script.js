@@ -26,7 +26,8 @@ document.addEventListener('DOMContentLoaded', () => {
             boxId: document.getElementById('boxId').value,
             phoneNumber: document.getElementById('phoneNumber').value,
             title: document.getElementById('title').value,
-            description: document.getElementById('description').value
+            description: document.getElementById('description').value,
+            pin: document.getElementById('pin').value
         };
 
         try {

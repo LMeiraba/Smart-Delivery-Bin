@@ -6,3 +6,10 @@ auth_info_baileys/
 
 # Ignore ESP32 config containing sensitive URLs
 esp32_smart_bin/config.h
+
+# Ignore temporary testing scripts
+esp32_i2c_scanner/
+esp32_keypad_scanner/
+esp32_keypad_test/
+esp32_oled_minimal/
+esp32_oled_test/

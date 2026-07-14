@@ -5,7 +5,8 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Smart Delivery Bin - Dashboard</title>
     <link rel="stylesheet" href="/style.css">
-    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+    <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
 </head>
 <body>
     <div class="background-orbs">
@@ -21,19 +22,28 @@
         </header>
 
         <form id="otp-form" class="glass-panel">
-            <div class="form-group">
-                <label for="boxId">Box ID</label>
-                <input type="text" id="boxId" name="boxId" placeholder="e.g. BIN-001" required>
-            </div>
-            
-            <div class="form-group">
-                <label for="phoneNumber">Courier's Phone Number</label>
-                <input type="tel" id="phoneNumber" name="phoneNumber" placeholder="e.g. 9876543210" required>
+            <div class="form-group-row">
+                <div class="form-group">
+                    <label for="boxId">Box ID</label>
+                    <input type="text" id="boxId" name="boxId" placeholder="e.g. BIN-001" required>
+                </div>
+                
+                <div class="form-group">
+                    <label for="phoneNumber">Courier Phone</label>
+                    <input type="tel" id="phoneNumber" name="phoneNumber" placeholder="e.g. 9876543210" required>
+                </div>
             </div>
 
-            <div class="form-group">
-                <label for="title">Package Title</label>
-                <input type="text" id="title" name="title" placeholder="e.g. Amazon Delivery (Optional)">
+            <div class="form-group-row">
+                <div class="form-group">
+                    <label for="title">Package Title</label>
+                    <input type="text" id="title" name="title" placeholder="e.g. Amazon Delivery (Optional)">
+                </div>
+
+                <div class="form-group">
+                    <label for="pin">Admin PIN <span class="lock-icon">🔒</span></label>
+                    <input type="password" id="pin" name="pin" placeholder="Enter PIN to authorize" required>
+                </div>
             </div>
 
             <div class="form-group">

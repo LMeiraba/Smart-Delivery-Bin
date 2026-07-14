@@ -6,11 +6,13 @@ import NodeCache from 'node-cache';
 import rateLimit from 'express-rate-limit';
 import path from 'path';
 import { fileURLToPath } from 'url';
+import helmet from 'helmet';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 
 const app = express();
+app.use(helmet());
 app.use(express.urlencoded({ extended: true }));
 app.use(express.json());
 app.use(express.static('public', { extensions: ['html'] }));
@@ -68,7 +70,10 @@ setInterval(async () => {
         // We'll just grab the boxId from the first event for the title
         const boxId = events[0].boxId; 
         
-        let msg = `📦 *Smart Bin Activity Report*\n\n*${events.length} New Event(s) for ${boxId}:*\n`;
+        let msg = `📊 *SMART BIN ACTIVITY REPORT*\n`;
+        msg += `━━━━━━━━━━━━━━━━━━━━━━\n`;
+        msg += `🏢 *Box ID:* ${boxId}\n`;
+        msg += `📝 *Events:* ${events.length} new update(s)\n\n`;
         
         events.forEach(e => {
             // Format time for India timezone (IST)
@@ -80,11 +85,15 @@ setInterval(async () => {
             else if (e.event === "PACKAGE_DEPOSITED") icon = "📦";
             else if (e.event === "LID_LEFT_OPEN") icon = "⚠️";
             else if (e.event === "LID_CLOSED") icon = "🔒";
+            else if (e.event === "AUTO_RELOCKED") icon = "🤖";
+            else if (e.event === "BIN_FULL") icon = "📈";
+            else if (e.event === "TAMPER_ALERT") icon = "🚨";
             
-            msg += `- [${timeString}] ${icon} ${e.event}`;
-            if (e.details) msg += ` (${e.details})`;
-            msg += `\n`;
+            msg += `*[${timeString}]* ${icon} *${e.event.replace(/_/g, ' ')}*\n`;
+            if (e.details) msg += `   ↳ _${e.details}_\n`;
         });
+        
+        msg += `\n━━━━━━━━━━━━━━━━━━━━━━`;
         
         try {
             await sock.sendMessage(chatId, { text: msg });
@@ -110,8 +119,14 @@ const apiLimiter = rateLimit({
     message: { status: "error", message: "Too many OTP requests from this device. Please wait 5 minutes before trying again." }
 });
 
+const ADMIN_PIN = process.env.ADMIN_PIN || "123456";
+
 app.post('/api/generate-otp', apiLimiter, async (req, res) => {
-    const { phoneNumber, boxId, title, description } = req.body;
+    const { phoneNumber, boxId, title, description, pin } = req.body;
+
+    if (pin !== ADMIN_PIN) {
+        return res.status(401).json({ status: "error", message: "Unauthorized: Invalid Admin PIN" });
+    }
 
     if (!phoneNumber || !boxId) {
         return res.status(400).json({ status: "error", message: "Phone Number and Box ID are required." });
@@ -152,12 +167,19 @@ app.post('/api/generate-otp', apiLimiter, async (req, res) => {
     cache.set(otp, { phoneNumber: cleanPhone, boxId, title, description });
     console.log(`Generated OTP: ${otp} for box ${boxId} (Phone: ${cleanPhone})`);
 
-    let messageText = `📦 *${title || 'New Package Delivery'}*\n\n`;
+    let messageText = `📦 *SECURE DELIVERY AUTHORIZATION*\n`;
+    messageText += `━━━━━━━━━━━━━━━━━━━━━━\n\n`;
+    messageText += `📌 *Package:* ${title || 'New Delivery'}\n`;
+    messageText += `🏢 *Box ID:* ${boxId}\n\n`;
+    messageText += `🔑 *YOUR UNLOCK OTP:  [ ${otp} ]*\n\n`;
+    
     if (description) {
-        messageText += `${description}\n\n`;
+        messageText += `📝 *Instructions:*\n_${description}_\n\n`;
     }
-    messageText += `*Box ID:* ${boxId}\n*Your Unlock OTP:* ${otp}\n\n`;
-    messageText += `_Instructions: Please enter the 4-digit OTP on the physical keypad of the delivery box to unlock it. This OTP will expire in 5 minutes._`;
+    
+    messageText += `⏳ _This OTP is valid for exactly 5 minutes._\n`;
+    messageText += `━━━━━━━━━━━━━━━━━━━━━━\n`;
+    messageText += `_Please enter the 4-digit code on the physical keypad of the delivery box to unlock it._`;
 
     try {
         await sock.sendMessage(chatId, { text: messageText });
