@@ -59,8 +59,19 @@ unsigned long lastInteractionTime = 0;
 bool isScreenOff = false;
 
 // Callback for WiFiManager
+WiFiManagerParameter* p_custom_box_id = NULL;
+WiFiManagerParameter* p_custom_owner_phone = NULL;
+
 void saveConfigCallback() {
-  shouldSaveConfig = true;
+  if (p_custom_box_id && p_custom_owner_phone) {
+    strcpy(boxId, p_custom_box_id->getValue());
+    preferences.putString("boxId", String(boxId));
+    
+    strcpy(ownerPhone, p_custom_owner_phone->getValue());
+    preferences.putString("ownerPhone", String(ownerPhone));
+    
+    Serial.println(F("Saved new config to NVS from Callback!"));
+  }
 }
 
 void sendLogToServer(String event, String details = "") {
@@ -118,15 +129,21 @@ void setup() {
   String savedPhone = preferences.getString("ownerPhone", "");
   savedPhone.toCharArray(ownerPhone, 20);
   emptyBaselineDistance = preferences.getLong("baseline", 50); // Default 50cm calibration
+  
+  Serial.println("\n--- DEBUG INFO ---");
+  Serial.println("Loaded Box ID: " + String(boxId));
+  Serial.println("Loaded Phone : '" + String(ownerPhone) + "'");
+  Serial.println("------------------\n");
 
   // Dual Mode / Captive Portal
   WiFiManager wm;
   
-  // Create custom input fields
-  WiFiManagerParameter custom_box_id("boxid", "Smart Bin ID (e.g. BIN-001)", boxId, 40);
-  WiFiManagerParameter custom_owner_phone("ownerphone", "Owner WhatsApp (e.g. 919876543210)", ownerPhone, 20);
-  wm.addParameter(&custom_box_id);
-  wm.addParameter(&custom_owner_phone);
+  // Create custom input fields using global pointers
+  if (!p_custom_box_id) p_custom_box_id = new WiFiManagerParameter("boxid", "Smart Bin ID (e.g. BIN-001)", boxId, 40);
+  if (!p_custom_owner_phone) p_custom_owner_phone = new WiFiManagerParameter("ownerphone", "Owner WhatsApp (e.g. 919876543210)", ownerPhone, 20);
+  
+  wm.addParameter(p_custom_box_id);
+  wm.addParameter(p_custom_owner_phone);
   wm.setSaveConfigCallback(saveConfigCallback);
 
   display.clearDisplay();
@@ -148,15 +165,10 @@ void setup() {
     ESP.restart();
   }
 
-  // Connected to Home Wi-Fi!
-  if (shouldSaveConfig) {
-    strcpy(boxId, custom_box_id.getValue());
-    preferences.putString("boxId", String(boxId));
-    strcpy(ownerPhone, custom_owner_phone.getValue());
-    preferences.putString("ownerPhone", String(ownerPhone));
-    Serial.println(F("Saved new config to NVS!"));
-  }
+  // We no longer need to manually check shouldSaveConfig here 
+  // because it's handled instantly inside saveConfigCallback!
 
+  display.clearDisplay();
   updateDisplay("ENTER OTP:");
 }
 
@@ -265,30 +277,19 @@ void handleKeypadInput() {
       Serial.println("Starting Config Portal. Connect to 'SmartBin-Setup' Wi-Fi...");
       
       WiFiManager wm;
-      WiFiManagerParameter custom_box_id("boxid", "Smart Bin ID (e.g. BIN-001)", boxId, 40);
-      WiFiManagerParameter custom_owner_phone("ownerphone", "Owner WhatsApp (e.g. 919876543210)", ownerPhone, 20);
-      wm.addParameter(&custom_box_id);
-      wm.addParameter(&custom_owner_phone);
+      if (!p_custom_box_id) p_custom_box_id = new WiFiManagerParameter("boxid", "Smart Bin ID (e.g. BIN-001)", boxId, 40);
+      if (!p_custom_owner_phone) p_custom_owner_phone = new WiFiManagerParameter("ownerphone", "Owner WhatsApp (e.g. 919876543210)", ownerPhone, 20);
+      
+      wm.addParameter(p_custom_box_id);
+      wm.addParameter(p_custom_owner_phone);
       wm.setSaveConfigCallback(saveConfigCallback);
       
       // Strict 2-minute timeout so they can't get stuck forever
       wm.setConfigPortalTimeout(120); 
       wm.startConfigPortal("SmartBin-Setup");
       
-      // We only reach this point if they click 'Save', or if the 2-minute timeout expires
-      if (shouldSaveConfig) {
-        strcpy(boxId, custom_box_id.getValue());
-        preferences.putString("boxId", String(boxId));
-        strcpy(ownerPhone, custom_owner_phone.getValue());
-        preferences.putString("ownerPhone", String(ownerPhone));
-        Serial.println(F("Saved new config to NVS!"));
-        
-        updateDisplay("SAVED! REBOOTING");
-        delay(2000);
-        ESP.restart();
-      } else {
-        Serial.println("Setup mode timed out. Resuming normal operation.");
-      }
+      // If they clicked Save, saveConfigCallback was already executed.
+      Serial.println("Exited Setup Mode. Resuming normal operation.");
       
       currentInput = "";
       updateDisplay("ENTER OTP:");
