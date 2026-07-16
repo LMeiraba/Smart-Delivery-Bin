@@ -64,14 +64,23 @@ WiFiManagerParameter* p_custom_owner_phone = NULL;
 
 void saveConfigCallback() {
   if (p_custom_box_id && p_custom_owner_phone) {
-    // WiFiManager automatically updates the globally allocated boxId and ownerPhone buffers 
-    // because we passed them into the WiFiManagerParameter constructor.
-    // Calling strcpy(ownerPhone, getValue()) was causing undefined behavior (copying a string into itself)!
+    Serial.println("--- CALLBACK TRIGGERED ---");
     
-    preferences.putString("boxId", String(boxId));
+    // Print what WiFiManager captured
+    String newPhone = String(p_custom_owner_phone->getValue());
+    Serial.println("New Phone from Portal: '" + newPhone + "'");
+    
+    // Store in global array
+    newPhone.toCharArray(ownerPhone, 20);
     preferences.putString("ownerPhone", String(ownerPhone));
     
-    Serial.println(F("Saved new config to NVS from Callback!"));
+    // Check Box ID as well
+    String newBox = String(p_custom_box_id->getValue());
+    newBox.toCharArray(boxId, 40);
+    preferences.putString("boxId", String(boxId));
+    
+    Serial.println("NVS Save Complete! Memory now holds: " + String(ownerPhone));
+    Serial.println("--------------------------");
   }
 }
 
