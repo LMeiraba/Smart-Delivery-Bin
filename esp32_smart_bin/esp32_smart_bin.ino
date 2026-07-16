@@ -298,11 +298,27 @@ void handleKeypadInput() {
       wm.setConfigPortalTimeout(120); 
       wm.startConfigPortal("SmartBin-Setup");
       
-      // If they clicked Save, saveConfigCallback was already executed.
-      Serial.println("Exited Setup Mode. Resuming normal operation.");
+      // WiFiManager skips saveConfigCallback if SSID/Password are left blank!
+      // So we force-save whatever is currently in the input boxes right here!
+      Serial.println("Exited Setup Mode. Force-saving custom parameters...");
       
-      currentInput = "";
-      updateDisplay("ENTER OTP:");
+      String newPhone = String(p_custom_owner_phone->getValue());
+      if (newPhone.length() >= 10) {
+        newPhone.toCharArray(ownerPhone, 20);
+        preferences.putString("ownerPhone", String(ownerPhone));
+        Serial.println("Force Saved Phone: " + newPhone);
+      }
+      
+      String newBox = String(p_custom_box_id->getValue());
+      if (newBox.length() > 0) {
+        newBox.toCharArray(boxId, 40);
+        preferences.putString("boxId", String(boxId));
+        Serial.println("Force Saved Box ID: " + newBox);
+      }
+      
+      updateDisplay("SAVED! REBOOTING");
+      delay(2000);
+      ESP.restart();
     }
     else {
       currentInput += key;
