@@ -64,6 +64,17 @@
                 <!-- Populated by JS -->
             </div>
         </section>
+
+        <section class="glass-panel mt-4" style="border-top: 1px solid rgba(255,255,255,0.1); padding-top: 20px;">
+            <h2 style="font-size: 1.1rem; color: #888;">Admin Controls</h2>
+            <div class="form-group" style="display: flex; gap: 10px; margin-top: 15px;">
+                <input type="text" id="clear-box-id" placeholder="Box ID (e.g. BIN-001)" style="flex: 1;">
+                <button type="button" id="clear-logs-btn" style="background: rgba(255,50,50,0.1); color: #ff5555; border: 1px solid rgba(255,50,50,0.2); width: auto; padding: 12px 20px;">
+                    Clear Logs
+                </button>
+            </div>
+            <div id="clear-status" class="status-msg hidden" style="font-size: 0.9rem;"></div>
+        </section>
     </main>
     <script src="/script.js"></script>
 </body>

@@ -141,8 +141,8 @@ void setup() {
   display.println(F("> SmartBin-Setup"));
   display.display();
 
-  // This will try to connect. If it fails, it spins up an AP named "SmartBin-Setup" with password "12345678"
-  if (!wm.autoConnect("SmartBin-Setup", "12345678")) {
+  // This will try to connect. If it fails, it spins up an AP named "SmartBin-Setup"
+  if (!wm.autoConnect("SmartBin-Setup")) {
     Serial.println(F("Failed to connect and hit timeout"));
     delay(3000);
     ESP.restart();
@@ -161,6 +161,22 @@ void setup() {
 }
 
 void loop() {
+  // Wi-Fi Connection Monitoring
+  static bool wasConnected = true;
+  if (WiFi.status() != WL_CONNECTED) {
+    if (wasConnected) {
+      wasConnected = false;
+      updateDisplay("NO WI-FI!");
+      Serial.println("[NETWORK] Wi-Fi Disconnected!");
+    }
+  } else {
+    if (!wasConnected) {
+      wasConnected = true;
+      updateDisplay("ENTER OTP:");
+      Serial.println("[NETWORK] Wi-Fi Reconnected!");
+    }
+  }
+
   // Screen Saver Logic (turn off OLED after 30s of idle)
   if (currentState == STATE_IDLE && !isScreenOff && (millis() - lastInteractionTime > 30000)) {
     display.ssd1306_command(SSD1306_DISPLAYOFF);
@@ -255,40 +271,27 @@ void handleKeypadInput() {
       wm.addParameter(&custom_owner_phone);
       wm.setSaveConfigCallback(saveConfigCallback);
       
-      wm.setConfigPortalBlocking(false); // Make it non-blocking so we can read keypad
-      wm.startConfigPortal("SmartBin-Setup", "12345678");
+      // Strict 2-minute timeout so they can't get stuck forever
+      wm.setConfigPortalTimeout(120); 
+      wm.startConfigPortal("SmartBin-Setup");
       
-      unsigned long setupStartTime = millis();
-      
-      // Keep portal alive for 2 minutes or until user cancels
-      while (millis() - setupStartTime < 120000) {
-        wm.process(); // Handle web traffic
+      // We only reach this point if they click 'Save', or if the 2-minute timeout expires
+      if (shouldSaveConfig) {
+        strcpy(boxId, custom_box_id.getValue());
+        preferences.putString("boxId", String(boxId));
+        strcpy(ownerPhone, custom_owner_phone.getValue());
+        preferences.putString("ownerPhone", String(ownerPhone));
+        Serial.println(F("Saved new config to NVS!"));
         
-        char cancelKey = keypad.getKey();
-        if (cancelKey == '*' || cancelKey == '#') {
-          Serial.println("Setup Mode Cancelled by Keypad!");
-          updateDisplay("CANCELLING...");
-          delay(1000);
-          ESP.restart();
-        }
-        
-        if (shouldSaveConfig) {
-          strcpy(boxId, custom_box_id.getValue());
-          preferences.putString("boxId", String(boxId));
-          strcpy(ownerPhone, custom_owner_phone.getValue());
-          preferences.putString("ownerPhone", String(ownerPhone));
-          Serial.println(F("Saved new config to NVS!"));
-          
-          updateDisplay("SAVED! REBOOTING");
-          delay(2000);
-          ESP.restart();
-        }
-        
-        delay(10); // Yield
+        updateDisplay("SAVED! REBOOTING");
+        delay(2000);
+        ESP.restart();
+      } else {
+        Serial.println("Setup mode timed out. Resuming normal operation.");
       }
       
-      Serial.println("Setup Mode Timeout!");
-      ESP.restart();
+      currentInput = "";
+      updateDisplay("ENTER OTP:");
     }
     else {
       currentInput += key;

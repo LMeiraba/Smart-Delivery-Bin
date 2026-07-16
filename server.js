@@ -262,6 +262,26 @@ app.get('/api/logs/:boxId', (req, res) => {
     res.json({ status: "success", data: boxLogs });
 });
 
+app.delete('/api/logs/:boxId', (req, res) => {
+    const { boxId } = req.params;
+    const { pin } = req.body;
+    
+    if (pin !== ADMIN_PIN) {
+        return res.status(401).json({ status: "error", message: "Unauthorized: Invalid Admin PIN" });
+    }
+    
+    // Remove all logs matching the boxId
+    let removedCount = 0;
+    for (let i = eventLogs.length - 1; i >= 0; i--) {
+        if (eventLogs[i].boxId === boxId) {
+            eventLogs.splice(i, 1);
+            removedCount++;
+        }
+    }
+    
+    res.json({ status: "success", message: `Cleared ${removedCount} logs for ${boxId}` });
+});
+
 app.get('/api/active-otps', (req, res) => {
     const keys = cache.keys();
     const active = keys.map(key => {

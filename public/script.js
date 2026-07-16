@@ -102,6 +102,55 @@ document.addEventListener('DOMContentLoaded', () => {
         });
     }, 1000);
 
+    // Clear Logs functionality
+    document.getElementById('clear-logs-btn').addEventListener('click', async () => {
+        const boxId = document.getElementById('clear-box-id').value.trim();
+        const pin = document.getElementById('pin').value.trim();
+        const statusEl = document.getElementById('clear-status');
+        
+        if (!boxId) {
+            statusEl.textContent = 'Please enter a Box ID';
+            statusEl.className = 'status-msg error';
+            statusEl.classList.remove('hidden');
+            return;
+        }
+        
+        if (!pin) {
+            statusEl.textContent = 'Admin PIN required (enter in the main form above)';
+            statusEl.className = 'status-msg error';
+            statusEl.classList.remove('hidden');
+            return;
+        }
+        
+        try {
+            const res = await fetch(`/api/logs/${boxId}`, {
+                method: 'DELETE',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ pin })
+            });
+            const data = await res.json();
+            
+            if (data.status === 'success') {
+                statusEl.textContent = data.message;
+                statusEl.className = 'status-msg success';
+            } else {
+                statusEl.textContent = data.message || 'Failed to clear logs';
+                statusEl.className = 'status-msg error';
+            }
+            statusEl.classList.remove('hidden');
+            
+            // Hide after 3 seconds
+            setTimeout(() => {
+                statusEl.classList.add('hidden');
+            }, 3000);
+            
+        } catch (err) {
+            statusEl.textContent = 'Network error while clearing logs';
+            statusEl.className = 'status-msg error';
+            statusEl.classList.remove('hidden');
+        }
+    });
+
     // Initial fetch
     fetchActiveOTPs();
 });
