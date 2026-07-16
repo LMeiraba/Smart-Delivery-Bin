@@ -1,58 +1,63 @@
-# Decentralized Smart Delivery Bin (IoT)
+# Smart Delivery Bin (IoT System)
 
-A complete Node.js backend and modern web dashboard for an IoT-enabled Smart Delivery Bin. The system allows an apartment owner to generate a one-time password (OTP) via a web dashboard, which is instantly sent to a courier's WhatsApp. The courier inputs the OTP on the physical bin to unlock it.
+A complete hardware and software solution for a decentralized IoT Smart Delivery Bin. The system consists of an ESP32 edge device, a Node.js backend, and a modern web dashboard. 
 
-## Features
+It allows you to generate a one-time password (OTP) via a web dashboard, which is instantly sent to a courier's WhatsApp. The courier inputs the OTP on the physical bin to unlock it. The bin tracks hardware events (lid open/close, deposits) and sends pooled Activity Reports back to your WhatsApp!
 
-- **WhatsApp Integration**: Uses `@whiskeysockets/baileys` to send OTPs and instructions to the courier directly on WhatsApp, bypassing SMS costs.
-- **Modern Dashboard**: A clean, dark-themed, glassmorphism web dashboard to manage and monitor active deliveries.
-- **In-Memory TTL Caching**: Uses `node-cache` for high performance, lightweight state management. OTPs automatically expire after 5 minutes.
-- **Security & Constraints**: 
+## 🌟 Key Features
+
+- **WhatsApp Integration**: Uses `@whiskeysockets/baileys` to send OTPs to couriers and Activity Reports to the owner directly on WhatsApp, bypassing SMS costs.
+- **ESP32 Edge Device**: 
+  - Dual Mode (Normal / Setup Captive Portal)
+  - 4x4 Matrix Keypad + OLED Display Interface
+  - Ultrasonic Package Detection & Magnetic Lid Switch Sensors
+  - Solenoid Relay Locking Mechanism
+- **Modern Dashboard**: A clean, dark-themed, glassmorphism web dashboard to manage deliveries, view live logs, and generate OTPs.
+- **In-Memory TTL Caching**: OTPs automatically expire after 5 minutes for security.
+- **Robust Security**: 
   - Strictly limits 1 active OTP per Delivery Bin.
   - Enforces a 5-minute cooldown per Courier Phone Number.
-  - Validates and enforces proper 10-digit phone number formatting.
+  - Pin-protected Admin Controls (Clear Logs).
 
-## Prerequisites
+## 🛠️ Hardware Requirements (ESP32)
 
-- [Node.js](https://nodejs.org/) (v16 or higher)
-- WhatsApp app on your phone (for scanning the QR code and linking the bot)
+- ESP32 Development Board
+- 4x4 Matrix Membrane Keypad
+- SSD1306 0.96" OLED Display (I2C)
+- HC-SR04 Ultrasonic Sensor
+- Magnetic Reed Switch (Door Sensor)
+- 5V Relay Module (to trigger 12V Solenoid Lock)
+- 12V Power Supply + 12V Solenoid Lock
 
-## Installation
+## 💻 Backend Installation (Node.js)
 
-1. Clone the repository:
+1. Clone the repository and install dependencies:
    ```bash
    git clone <your-repo-url>
    cd delivery-box
-   ```
-
-2. Install dependencies:
-   ```bash
    npm install
    ```
-
-## Usage
-
-1. Start the server:
+2. Start the server:
    ```bash
    npm start
    ```
+3. **Authenticate the Bot**: A QR code will print in the terminal. Open WhatsApp, go to **Linked Devices**, and scan it. The session saves securely in `auth_info_baileys/`.
 
-2. **Authenticate the Bot**: Check your terminal. A QR code will be printed. Open WhatsApp on your phone, go to **Linked Devices**, and scan the QR code. Your session will be securely saved in `auth_info_baileys/` (ignored by git).
+## 🌐 API Endpoints & Architecture
 
-3. **Access the Dashboard**: Open your web browser and navigate to `http://localhost:3000`.
+- `POST /api/generate-otp` : Generates OTP & sends to courier via WhatsApp.
+- `POST /api/verify-otp` : ESP32 endpoint to verify entered OTPs.
+- `POST /api/logs` : ESP32 endpoint to push hardware logs (Lid Open, Deposited, etc.).
+- `GET /api/logs/:boxId` : Fetches event history for a specific bin.
+- `DELETE /api/logs/:boxId` : Admin endpoint to wipe event history (Requires PIN).
+- `GET /api/active-otps` : Returns currently active deliveries.
 
-4. **Generate OTP**: Enter a Box ID, Courier Phone Number, and optionally a Package Title and Instructions. Click Generate, and the courier will instantly receive the OTP.
+## 🔌 ESP32 Setup & Wiring
 
-## API Endpoints
+The `esp32_smart_bin.ino` sketch uses the `WiFiManager` library to avoid hardcoding Wi-Fi credentials. 
 
-### `POST /api/generate-otp`
-Generates an OTP and sends it via WhatsApp.
-- **Body**: `{ boxId: "string", phoneNumber: "string", title?: "string", description?: "string" }`
-
-### `POST /api/verify-otp`
-Endpoint intended for the ESP8266/ESP32 Edge Microcontroller to verify an entered OTP.
-- **Body**: `{ boxId: "string", enteredCode: "string" }`
-- **Response**: `{ status: "success", command: "UNLOCK" }` or `{ status: "fail", command: "KEEP_LOCKED" }`
-
-### `GET /api/active-otps`
-Returns currently active deliveries with masked phone numbers and remaining TTL.
+To configure a new ESP32:
+1. Boot the ESP32. If it cannot connect to Wi-Fi, it broadcasts `SmartBin-Setup`.
+2. Connect to the network and navigate to `192.168.4.1` on your phone.
+3. Enter your Home Wi-Fi credentials, your **Smart Bin ID** (e.g. `BIN-001`), and your **Owner WhatsApp Number** (10-digits).
+4. Click Save. The ESP32 will reboot and connect!
