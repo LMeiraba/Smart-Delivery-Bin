@@ -64,10 +64,11 @@ WiFiManagerParameter* p_custom_owner_phone = NULL;
 
 void saveConfigCallback() {
   if (p_custom_box_id && p_custom_owner_phone) {
-    strcpy(boxId, p_custom_box_id->getValue());
-    preferences.putString("boxId", String(boxId));
+    // WiFiManager automatically updates the globally allocated boxId and ownerPhone buffers 
+    // because we passed them into the WiFiManagerParameter constructor.
+    // Calling strcpy(ownerPhone, getValue()) was causing undefined behavior (copying a string into itself)!
     
-    strcpy(ownerPhone, p_custom_owner_phone->getValue());
+    preferences.putString("boxId", String(boxId));
     preferences.putString("ownerPhone", String(ownerPhone));
     
     Serial.println(F("Saved new config to NVS from Callback!"));
